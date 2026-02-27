@@ -1,17 +1,18 @@
 // src/pages/ProductDetails.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiHeart, FiShoppingCart, FiMinus, FiPlus, FiTruck, FiRefreshCw, FiShield } from 'react-icons/fi';
-
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import { productService } from '../../services/productService';
 import Navbar from '../../components/common/Navbar';
+import ClientNavbar from '../../components/client/ClientNavbar'; // ← Import du navbar client
 import Footer from '../../components/common/Footer';
 import ProductCard from '../../ui/ProductCard';
 
 const ProductDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,10 +72,27 @@ const ProductDetails = () => {
     }
   };
 
+  const handleHomeClick = () => {
+    if (user && user.role === 'client') {
+      navigate('/client'); // Redirige vers page d'accueil client
+    } else {
+      navigate('/'); // Redirige vers page d'accueil publique
+    }
+  };
+
+  const handleCategoryClick = (categoryId) => {
+    if (user && user.role === 'client') {
+      navigate(`/products?category=${categoryId}`);
+    } else {
+      navigate(`/products?category=${categoryId}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
-        <Navbar />
+        {/* Afficher le navbar approprié selon l'utilisateur */}
+        {user && user.role === 'client' ? <ClientNavbar /> : <Navbar />}
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
@@ -86,10 +104,15 @@ const ProductDetails = () => {
   if (!product) {
     return (
       <div className="min-h-screen">
-        <Navbar />
+        {user && user.role === 'client' ? <ClientNavbar /> : <Navbar />}
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold text-gray-800">Produit non trouvé</h2>
-          <Link to="/" className="text-indigo-600 mt-4 inline-block">Retour à l'accueil</Link>
+          <button 
+            onClick={handleHomeClick}
+            className="text-indigo-600 mt-4 inline-block hover:underline"
+          >
+            Retour à l'accueil
+          </button>
         </div>
         <Footer />
       </div>
@@ -98,17 +121,30 @@ const ProductDetails = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
+      {/* Navbar conditionnel selon le rôle de l'utilisateur */}
+      {user && user.role === 'client' ? <ClientNavbar /> : <Navbar />}
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Fil d'Ariane */}
         <nav className="text-sm breadcrumbs mb-8">
           <ol className="flex items-center space-x-2">
-            <li><Link to="/" className="text-gray-500 hover:text-indigo-600">Home</Link></li>
+            <li>
+              <button 
+                onClick={handleHomeClick}
+                className="text-gray-500 hover:text-indigo-600"
+              >
+                Home
+              </button>
+            </li>
             <li className="text-gray-400">/</li>
-            <li><Link to={`/products?category=${product.categorie_id?._id}`} className="text-gray-500 hover:text-indigo-600">
-              {product.categorie_id?.nom || 'Catégorie'}
-            </Link></li>
+            <li>
+              <button
+                onClick={() => handleCategoryClick(product.categorie_id?._id)}
+                className="text-gray-500 hover:text-indigo-600"
+              >
+                {product.categorie_id?.nom || 'Catégorie'}
+              </button>
+            </li>
             <li className="text-gray-400">/</li>
             <li className="text-gray-800 font-medium">{product.nom}</li>
           </ol>

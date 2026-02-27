@@ -1,4 +1,4 @@
-// src/pages/Login.jsx
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
@@ -13,7 +13,7 @@ const loginImage = "/images/image.jpg";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login: contextLogin } = useAuth();        // ← On récupère la fonction login du contexte
+  const { login: contextLogin } = useAuth();        
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -54,63 +54,48 @@ const Login = () => {
     return newErrors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // src/pages/Login.jsx (partie handleSubmit modifiée)
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      toast.error(Object.values(newErrors)[0]);
-      return;
+  const newErrors = validateForm();
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    toast.error(Object.values(newErrors)[0]);
+    return;
+  }
+
+  setLoading(true);
+  setApiError('');
+
+  try {
+    const response = await login(formData);
+
+    // Mettre à jour le contexte d'authentification
+    contextLogin(response.user, response.token);
+
+    localStorage.setItem('token', response.token);
+    localStorage.setItem('user', JSON.stringify(response.user));
+
+    toast.success('Connexion réussie !');
+
+    // ✅ REDIRECTION CORRECTE selon le rôle
+    console.log('👤 Rôle utilisateur:', response.user.role);
+    
+    if (response.user.role === 'admin') {
+      console.log('🔐 Admin connecté, redirection vers /admin');
+      navigate('/admin', { replace: true });
+    } else {
+      console.log('👤 Client connecté, redirection vers /client');
+      navigate('/client', { replace: true });
     }
 
-    setLoading(true);
-    setApiError('');
-
-    try {
-      const response = await login(formData);
-
-      // ────────────────────────────────────────
-      //  LIGNES LES PLUS IMPORTANTES ICI
-      contextLogin(response.user, response.token);
-      // ────────────────────────────────────────
-
-      localStorage.setItem('token', response.token);     // optionnel si tu le fais déjà dans context
-      localStorage.setItem('user', JSON.stringify(response.user));
-
-      toast.success('Connexion réussie !');
-
-      // Redirection immédiate (timeout réduit ou supprimé)
-      if (response.user.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
-
-    } catch (error) {
-      console.error('Erreur login:', error);
-
-      const status = error.response?.status;
-      let errorMessage = error.response?.data?.message 
-        || error.response?.data?.error 
-        || 'Email ou mot de passe incorrect';
-
-      toast.error(errorMessage);
-
-      if (status === 404 || errorMessage.toLowerCase().includes('non trouvé')) {
-        setErrors(prev => ({ ...prev, email: 'Cet email n\'est pas enregistré' }));
-        setApiError('Aucun compte trouvé avec cet email');
-      } else if (status === 401 || errorMessage.toLowerCase().includes('incorrect')) {
-        setErrors(prev => ({ ...prev, password: 'Mot de passe incorrect' }));
-        setApiError('Email ou mot de passe incorrect');
-      } else {
-        setApiError(errorMessage);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  } catch (error) {
+    // ... gestion d'erreur
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Navigation */}

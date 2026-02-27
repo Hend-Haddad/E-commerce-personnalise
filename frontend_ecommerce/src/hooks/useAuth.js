@@ -2,7 +2,6 @@
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
-// ✅ Bien exporter la fonction
 export const useAuth = () => {
   const context = useContext(AuthContext);
   
@@ -10,18 +9,24 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
 
-  const { user, login, logout, loading } = context;
+  const { user, login, logout, updateUser, loading } = context;
 
   const isAdmin = () => {
     return user?.role === 'admin';
+  };
+
+  const isClient = () => {
+    return user?.role === 'client';
   };
 
   return {
     user,
     login,
     logout,
+    updateUser, // ← Nouvelle fonction
     loading,
     isAdmin,
+    isClient,
     token: localStorage.getItem('token')
   };
 };
