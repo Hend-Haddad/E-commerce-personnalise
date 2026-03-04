@@ -6,11 +6,14 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
-
+import cartRoutes from "./routes/cartRoutes.js";
+import orderRoutes from './routes/orderRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
 import { createDefaultAdmin } from "./scripts/createAdmin.js";
 // backend/src/app.js (ajoutez ces lignes)
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { optionalAuth, protect } from "./middleware/auth.js";
 dotenv.config();
 
 const app = express();
@@ -39,6 +42,9 @@ app.get("/api/test", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/cart", optionalAuth,cartRoutes);
+app.use("/api/orders", protect, orderRoutes); 
+app.use("/api/wishlist", wishlistRoutes);
 // Route 404
 app.use((req, res) => {
   res.status(404).json({ 

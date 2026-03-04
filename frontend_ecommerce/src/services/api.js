@@ -1,55 +1,60 @@
-// src/services/api.js
 import axios from 'axios';
 
-// URL de base de l'API (backend)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// Création d'une instance axios avec configuration de base
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: 'http://localhost:5000/api',
+  timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 10000, // 10 secondes timeout
+    'Content-Type': 'application/json'
+  }
 });
 
-// Intercepteur pour ajouter le token d'authentification à chaque requête
+// UN SEUL intercepteur pour les requêtes
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    
+    console.log('='.repeat(50));
+    console.log('🔍 INTERCEPTEUR AXIOS');
+    console.log('📍 URL:', config.url);
+    console.log('📍 Méthode:', config.method);
+    console.log('📍 Token dans localStorage:', token ? 'PRÉSENT' : 'ABSENT');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Header Authorization ajouté');
+      console.log('📍 Valeur:', config.headers.Authorization.substring(0, 30) + '...');
+    } else {
+      console.log('⚠️ Pas de token disponible');
     }
-    console.log(`📡 ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+    
+    console.log('📍 Headers complets:', config.headers);
+    console.log('📍 Params:', config.params);
+    console.log('='.repeat(50));
+    
     return config;
   },
   (error) => {
-    console.error('❌ Erreur de requête:', error);
+    console.error('❌ Erreur intercepteur:', error);
     return Promise.reject(error);
   }
 );
 
-// Intercepteur pour gérer les réponses et les erreurs globales
+// Intercepteur pour les réponses
 api.interceptors.response.use(
   (response) => {
-    console.log(`📥 Réponse reçue:`, response.data);
+    console.log('📥 Réponse reçue:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data
+    });
     return response;
   },
   (error) => {
-    console.error('❌ Erreur de réponse:', error.response?.data || error.message);
-    
-    // Gestion des erreurs d'authentification (401)
-    if (error.response?.status === 401) {
-      console.log('🔓 Token expiré ou invalide, redirection vers login...');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Ne rediriger que si on n'est pas déjà sur la page de login
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
-      }
-    }
-    
+    console.error('❌ Erreur réponse:', {
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message,
+      url: error.config?.url
+    });
     return Promise.reject(error);
   }
 );

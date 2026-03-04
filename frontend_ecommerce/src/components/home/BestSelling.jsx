@@ -24,8 +24,8 @@ const BestSelling = ({ products }) => {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="text-indigo-600 font-semibold mb-2">This Month</p>
-            <h2 className="text-3xl font-bold text-gray-800">Best Selling Products</h2>
+            <p className="text-indigo-600 font-semibold mb-2">Ce mois-ci</p>
+            <h2 className="text-3xl font-bold text-gray-800">Meilleures ventes</h2>
           </div>
           <Link
             to="/products?best-selling=true"

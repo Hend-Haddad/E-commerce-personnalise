@@ -12,7 +12,7 @@ import DashboardHome from './pages/admin/DashboardHome';
 import CategoriesPage from './pages/admin/CategoriesPage';
 
 import ClientsPage from './pages/admin/ClientsPage';
-import OrdersPage from './pages/admin/OrdersPage';
+//import OrdersPage from './pages/admin/OrdersPage';
 import AdminRoute from './components/admin/AdminRoute';
 import ProductDetails from './pages/product/ProductDetails';
 import ProductsPage from './pages/product/ProductsPage';
@@ -25,6 +25,9 @@ import WishlistPage from './pages/client/WishlistPage';
 import SettingsPage from './pages/client/SettingsPage';
 import ClientRoute from './components/client/ClientRoute';
 import NotificationsPage from './pages/client/NotificationsPage';
+import OrdersPage from './pages/client/OrdersPage';
+import CartPage from './pages/CartPage';
+import OrderDetailsPage from './pages/client/OrderDetailsPage';
 function App() {
   return (
     <AuthProvider>
@@ -35,7 +38,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/products" element={<ProductsPage />} />
-
+         <Route path="/cart" element={<CartPage />} />
          <Route path="/client" element={
           <ClientRoute>
             <ClientHome />
@@ -48,12 +51,9 @@ function App() {
           </ClientRoute>
         } />
         
-        <Route path="/client/orders" element={
-          <ClientRoute>
-            <OrdersPage />
-          </ClientRoute>
-        } />
-        
+    <Route path="/client/orders" element={<OrdersPage />} />
+    <Route path="/client/orders/:id" element={<OrderDetailsPage />} />
+
         <Route path="/client/wishlist" element={
           <ClientRoute>
             <WishlistPage />

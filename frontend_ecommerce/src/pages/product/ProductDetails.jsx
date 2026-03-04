@@ -4,9 +4,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiHeart, FiShoppingCart, FiMinus, FiPlus, FiTruck, FiRefreshCw, FiShield } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
+import { useCart } from '../../hooks/useCart';
+import { useWishlist } from '../../hooks/useWishlist'; // ← AJOUTER useWishlist
 import { productService } from '../../services/productService';
 import Navbar from '../../components/common/Navbar';
-import ClientNavbar from '../../components/client/ClientNavbar'; // ← Import du navbar client
+import ClientNavbar from '../../components/client/ClientNavbar';
 import Footer from '../../components/common/Footer';
 import ProductCard from '../../ui/ProductCard';
 
@@ -14,15 +16,28 @@ const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist(); // ← AJOUTER
+  
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [wishlistToggling, setWishlistToggling] = useState(false); // ← État pour chargement favoris
+  const [isWishlisted, setIsWishlisted] = useState(false); // ← État pour savoir si en favoris
 
   useEffect(() => {
     loadProduct();
   }, [id]);
+
+  // Vérifier si le produit est dans les favoris (uniquement si connecté)
+  useEffect(() => {
+    if (user && product?._id) {
+      setIsWishlisted(isInWishlist(product._id));
+    }
+  }, [user, product, isInWishlist]);
 
   const loadProduct = async () => {
     try {
@@ -52,12 +67,64 @@ const ProductDetails = () => {
     return `http://localhost:5000${imagePath}`;
   };
 
-  const handleAddToCart = () => {
-    if (!user) {
-      toast.error('Veuillez vous connecter pour ajouter au panier');
+ const handleAddToCart = async () => {
+    // Vérification du stock uniquement, pas de vérification de connexion
+    if (product.quantite_stock === 0) {
+      toast.error('Produit en rupture de stock');
       return;
     }
-    toast.success(`${quantity} article(s) ajouté(s) au panier`);
+
+    if (quantity > product.quantite_stock) {
+      toast.error(`Stock insuffisant. Maximum: ${product.quantite_stock}`);
+      return;
+    }
+
+    setAddingToCart(true);
+    try {
+      console.log('🛒 Ajout au panier - produit:', product._id, 'quantité:', quantity);
+      
+      const result = await addToCart(product._id, quantity);
+      
+      console.log('📥 Résultat addToCart:', result);
+      
+      if (result?.success) {
+        toast.success(`${quantity} ${quantity > 1 ? 'articles' : 'article'} ajouté(s) au panier`);
+      } else {
+        // Message adapté selon le contexte
+        if (!user) {
+          toast.success(`${quantity} ${quantity > 1 ? 'articles' : 'article'} ajouté(s) au panier (temporaire)`);
+        } else {
+          toast.error(result?.message || 'Erreur lors de l\'ajout au panier');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erreur ajout au panier:', error);
+      toast.error('Erreur lors de l\'ajout au panier');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  // ❤️ TOGGLE WISHLIST - UNIQUEMENT POUR UTILISATEURS CONNECTÉS
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      toast.error('Veuillez vous connecter pour ajouter aux favoris');
+      navigate('/login', { state: { from: `/product/${id}` } });
+      return;
+    }
+
+    setWishlistToggling(true);
+    try {
+      const result = await toggleWishlist(product, product._id);
+      if (result?.success) {
+        setIsWishlisted(!isWishlisted);
+      }
+    } catch (error) {
+      console.error('❌ Erreur toggle favoris:', error);
+      toast.error("Erreur lors de la modification des favoris");
+    } finally {
+      setWishlistToggling(false);
+    }
   };
 
   const increaseQuantity = () => {
@@ -74,15 +141,15 @@ const ProductDetails = () => {
 
   const handleHomeClick = () => {
     if (user && user.role === 'client') {
-      navigate('/client'); // Redirige vers page d'accueil client
+      navigate('/client');
     } else {
-      navigate('/'); // Redirige vers page d'accueil publique
+      navigate('/');
     }
   };
 
   const handleCategoryClick = (categoryId) => {
     if (user && user.role === 'client') {
-      navigate(`/products?category=${categoryId}`);
+      navigate(`/client?category=${categoryId}`);
     } else {
       navigate(`/products?category=${categoryId}`);
     }
@@ -91,7 +158,6 @@ const ProductDetails = () => {
   if (loading) {
     return (
       <div className="min-h-screen">
-        {/* Afficher le navbar approprié selon l'utilisateur */}
         {user && user.role === 'client' ? <ClientNavbar /> : <Navbar />}
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -121,7 +187,6 @@ const ProductDetails = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navbar conditionnel selon le rôle de l'utilisateur */}
       {user && user.role === 'client' ? <ClientNavbar /> : <Navbar />}
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -154,7 +219,6 @@ const ProductDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
           {/* Galerie d'images */}
           <div>
-            {/* Image principale */}
             <div className="bg-gray-100 rounded-lg overflow-hidden mb-4 aspect-square">
               <img
                 src={getImageUrl(product.images?.[selectedImage])}
@@ -163,7 +227,6 @@ const ProductDetails = () => {
               />
             </div>
             
-            {/* Miniatures */}
             {product.images && product.images.length > 1 && (
               <div className="grid grid-cols-5 gap-2">
                 {product.images.map((img, index) => (
@@ -189,7 +252,6 @@ const ProductDetails = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">{product.nom}</h1>
             
-            {/* Note et avis */}
             <div className="flex items-center space-x-4 mb-4">
               <div className="flex text-yellow-400">
                 {'★'.repeat(product.rating || 4)}
@@ -203,7 +265,6 @@ const ProductDetails = () => {
               </span>
             </div>
 
-            {/* Prix */}
             <div className="mb-6">
               <span className="text-3xl font-bold text-indigo-600">${product.prix}</span>
               {product.oldPrice && (
@@ -211,7 +272,6 @@ const ProductDetails = () => {
               )}
             </div>
 
-            {/* Description */}
             <p className="text-gray-600 mb-8">{product.description}</p>
 
             {/* Quantité et ajout au panier */}
@@ -219,34 +279,91 @@ const ProductDetails = () => {
               <div className="flex items-center border border-gray-300 rounded-lg">
                 <button
                   onClick={decreaseQuantity}
-                  className="px-3 py-2 hover:bg-gray-100"
-                  disabled={quantity <= 1}
+                  className="px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+                  disabled={quantity <= 1 || addingToCart}
                 >
                   <FiMinus />
                 </button>
                 <span className="px-4 py-2 border-x border-gray-300">{quantity}</span>
                 <button
                   onClick={increaseQuantity}
-                  className="px-3 py-2 hover:bg-gray-100"
-                  disabled={quantity >= (product.quantite_stock || 10)}
+                  className="px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+                  disabled={quantity >= (product.quantite_stock || 10) || addingToCart}
                 >
                   <FiPlus />
                 </button>
               </div>
               
+              {/* 🛒 BOUTON AJOUTER AU PANIER - VISIBLE POUR TOUS */}
               <button
                 onClick={handleAddToCart}
-                disabled={product.quantite_stock === 0}
-                className="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg hover:bg-indigo-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={product.quantite_stock === 0 || addingToCart}
+                className="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg hover:bg-indigo-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                <FiShoppingCart className="inline mr-2" />
-                Ajouter au panier
+                {addingToCart ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                    Ajout en cours...
+                  </>
+                ) : (
+                  <>
+                    <FiShoppingCart className="inline mr-2" />
+                    Ajouter au panier
+                  </>
+                )}
               </button>
               
-              <button className="p-3 border border-gray-300 rounded-lg hover:bg-red-50 hover:text-red-600 transition">
-                <FiHeart size={20} />
-              </button>
+              {/* ❤️ BOUTON FAVORIS - UNIQUEMENT POUR UTILISATEURS CONNECTÉS */}
+              {user ? (
+                <button
+                  onClick={handleToggleWishlist}
+                  disabled={wishlistToggling}
+                  className={`p-3 border rounded-lg transition ${
+                    isWishlisted
+                      ? 'border-red-500 text-red-500 bg-red-50'
+                      : 'border-gray-300 text-gray-600 hover:border-red-500 hover:text-red-500'
+                  } ${wishlistToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isWishlisted ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                >
+                  {wishlistToggling ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full" />
+                  ) : (
+                    <FiHeart size={20} fill={isWishlisted ? 'currentColor' : 'none'} />
+                  )}
+                </button>
+              ) : (
+                // Pour les visiteurs, on peut soit ne rien afficher, soit un bouton grisé
+                // Option 1: Ne rien afficher (pas de bouton)
+                // Option 2: Bouton grisé qui redirige vers login
+                <button
+                  onClick={() => {
+                    toast.error('Veuillez vous connecter pour ajouter aux favoris');
+                    navigate('/login', { state: { from: `/product/${id}` } });
+                  }}
+                  className="p-3 border border-gray-300 rounded-lg text-gray-400 hover:bg-gray-50 transition"
+                  title="Connectez-vous pour ajouter aux favoris"
+                >
+                  <FiHeart size={20} />
+                </button>
+              )}
             </div>
+
+            {/* Indicateur de stock */}
+            {product.quantite_stock > 0 && product.quantite_stock < 5 && (
+              <p className="text-sm text-orange-600 mb-4">
+                ⚠️ Plus que {product.quantite_stock} en stock
+              </p>
+            )}
+
+            {/* Message pour les visiteurs - optionnel */}
+            {!user && (
+              <p className="text-sm text-gray-500 mb-4 flex items-center">
+                <FiHeart className="mr-1 text-gray-400" size={14} />
+                <Link to="/login" className="text-indigo-600 hover:underline">
+                  Connectez-vous
+                </Link> pour ajouter ce produit à vos favoris
+              </p>
+            )}
 
             {/* Services */}
             <div className="border-t border-gray-200 pt-6 space-y-3">

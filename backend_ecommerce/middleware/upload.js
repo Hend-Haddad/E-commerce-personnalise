@@ -22,13 +22,15 @@ const storage = multer.diskStorage({
     // Générer un nom unique pour éviter les conflits
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, 'category-' + uniqueSuffix + ext);
+    
+    // Préfixe différent selon le type (produit ou catégorie)
+    const prefix = file.fieldname === 'image' ? 'category' : 'product';
+    cb(null, prefix + '-' + uniqueSuffix + ext);
   }
 });
 
-// Filtrer les types de fichiers - Version améliorée avec plus de formats
+// Filtrer les types de fichiers
 const fileFilter = (req, file, cb) => {
-  // Liste étendue des types MIME acceptés
   const allowedMimes = [
     'image/jpeg',
     'image/jpg',
@@ -36,57 +38,41 @@ const fileFilter = (req, file, cb) => {
     'image/gif',
     'image/webp',
     'image/svg+xml',
-    'image/bmp',
-    'image/x-icon'
+    'image/bmp'
   ];
-
-  // Extensions autorisées
-  const allowedExtensions = /jpeg|jpg|png|gif|webp|svg|bmp|ico/i;
-  
-  // Vérifier l'extension
-  const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
-  
-  // Vérifier le type MIME
-  const mimetype = allowedMimes.includes(file.mimetype.toLowerCase());
 
   console.log('📸 Fichier reçu:', {
     originalname: file.originalname,
     mimetype: file.mimetype,
-    extension: path.extname(file.originalname),
-    size: file.size
+    fieldname: file.fieldname
   });
 
-  if (mimetype && extname) {
-    return cb(null, true);
+  if (allowedMimes.includes(file.mimetype.toLowerCase())) {
+    cb(null, true);
   } else {
-    const error = new Error(
-      `Format non supporté. Types acceptés: ${allowedExtensions.source}`
-    );
-    error.status = 400;
-    cb(error, false);
+    cb(new Error(`Format non supporté. Types acceptés: JPG, PNG, GIF, WEBP`), false);
   }
 };
 
-// Limiter la taille des fichiers (5MB max)
-const upload = multer({
+// ✅ Configuration pour UPLOAD MULTIPLE (produits - champ "images")
+export const uploadMultiple = multer({
   storage: storage,
-  limits: { 
-    fileSize: 5 * 1024 * 1024, // 5MB
-    files: 1 // Un seul fichier
-  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max par fichier
   fileFilter: fileFilter
-});
+}).array('images', 10); // ← 10 images max
 
-// Middleware pour upload simple (une seule image)
-export const uploadSingle = upload.single('image');
+// ✅ Configuration pour UPLOAD SINGLE (catégories - champ "image")
+export const uploadSingle = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: fileFilter
+}).single('image'); // ← Une seule image
 
-// Middleware pour upload multiple (pour les produits)
-export const uploadMultiple = upload.array('images', 10);
-
-// Middleware de gestion d'erreurs pour multer
+// Middleware de gestion d'erreurs
 export const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    // Erreur Multer (taille, nombre de fichiers, etc.)
+    console.error('❌ Erreur Multer:', err);
+    
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
@@ -96,7 +82,13 @@ export const handleUploadError = (err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         success: false,
-        message: 'Trop de fichiers. Maximum: 10 images'
+        message: `Trop de fichiers. Maximum: ${err.field === 'images' ? '10 images' : '1 image'}`
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Champ de fichier incorrect. Utilisez "images" pour les produits ou "image" pour les catégories'
       });
     }
     return res.status(400).json({
@@ -104,7 +96,7 @@ export const handleUploadError = (err, req, res, next) => {
       message: err.message
     });
   } else if (err) {
-    // Autres erreurs
+    console.error('❌ Erreur upload:', err);
     return res.status(400).json({
       success: false,
       message: err.message || 'Erreur lors de l\'upload'
@@ -113,4 +105,9 @@ export const handleUploadError = (err, req, res, next) => {
   next();
 };
 
-export default upload;
+// Export par défaut pour compatibilité
+export default {
+  uploadMultiple,
+  uploadSingle,
+  handleUploadError
+};

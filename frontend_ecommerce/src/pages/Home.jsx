@@ -10,8 +10,10 @@ import { productService } from '../services/productService';
 import { categoryService } from '../services/categoryService';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
+import { useCart } from '../hooks/useCart';
 
 const Home = () => {
+  const { cart } = useCart();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);

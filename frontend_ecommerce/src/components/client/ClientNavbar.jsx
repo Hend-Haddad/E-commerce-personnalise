@@ -11,20 +11,24 @@ import {
   FiPackage,
   FiBell,
   FiChevronDown,
-  FiLock // ← Nouvelle icône pour le mot de passe
+  FiLock
 } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
+import { useCart } from '../../hooks/useCart';
+import { useWishlist } from '../../hooks/useWishlist';
 import { categoryService } from '../../services/categoryService';
-import ChangePasswordModal from '../client/ChangePasswordModal'; // ← Nouveau composant
+import ChangePasswordModal from '../client/ChangePasswordModal';
 
 const ClientNavbar = ({ onSearch, onCategorySelect }) => {
+  const { cart } = useCart();
+  const { itemCount: wishlistCount } = useWishlist(); // ← Compteur favoris
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [showPasswordModal, setShowPasswordModal] = useState(false); // ← État pour le modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const menuRef = useRef(null);
 
   // Charger les catégories au montage
@@ -41,6 +45,7 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
     }
   };
 
+  // Fermer les menus quand on clique à l'extérieur
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -77,8 +82,8 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
   };
 
   const handleOpenPasswordModal = () => {
-    setShowUserMenu(false); // Fermer le menu
-    setShowPasswordModal(true); // Ouvrir le modal
+    setShowUserMenu(false);
+    setShowPasswordModal(true);
   };
 
   const menuItems = [
@@ -99,18 +104,17 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
               SmartShop
             </button>
 
-            {/* Categories Dropdown avec données de la BD */}
+            {/* Categories Dropdown */}
             <div className="hidden md:block relative">
               <button
                 onClick={() => setShowCategories(!showCategories)}
                 className="flex items-center space-x-1 text-gray-700 hover:text-indigo-600"
               >
-                <span>Categories</span>
+                <span>Catégories</span>
                 <FiChevronDown />
               </button>
               {showCategories && (
                 <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 max-h-96 overflow-y-auto">
-                  {/* Option "Toutes les catégories" */}
                   <button
                     onClick={() => handleCategoryClick('')}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 font-medium border-b border-gray-100"
@@ -145,12 +149,18 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
 
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-6">
-              <button onClick={handleHomeClick} className="text-gray-700 hover:text-indigo-600">Home</button>
-              <Link to="/brand" className="text-gray-700 hover:text-indigo-600">Brand</Link>
-              <Link to="/offers" className="text-gray-700 hover:text-indigo-600">Offers</Link>
-              <Link to="/publications" className="text-gray-700 hover:text-indigo-600">Publication House</Link>
-              <Link to="/vendors" className="text-gray-700 hover:text-indigo-600">All Vendors</Link>
-              <Link to="/vendor-zone" className="text-gray-700 hover:text-indigo-600">Vendor Zone</Link>
+              <button onClick={handleHomeClick} className="text-gray-700 hover:text-indigo-600">
+                Accueil
+              </button>
+              <Link to="/brand" className="text-gray-700 hover:text-indigo-600">
+                Marques
+              </Link>
+              <Link to="/offers" className="text-gray-700 hover:text-indigo-600">
+                Offres
+              </Link>
+              <Link to="/vendors" className="text-gray-700 hover:text-indigo-600">
+                Vendeurs
+              </Link>
             </div>
 
             {/* Search Bar */}
@@ -158,7 +168,7 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
               <form onSubmit={handleSearch} className="relative">
                 <input
                   type="text"
-                  placeholder="Search for items..."
+                  placeholder="Rechercher un produit..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-2 pl-4 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -174,18 +184,24 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
 
             {/* Icons */}
             <div className="flex items-center space-x-4">
+              {/* 🔴 Wishlist Icon avec compteur dynamique */}
               <Link to="/client/wishlist" className="text-gray-600 hover:text-indigo-600 relative">
                 <FiHeart size={20} />
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  3
-                </span>
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
               </Link>
               
+              {/* Cart Icon avec compteur */}
               <Link to="/cart" className="text-gray-600 hover:text-indigo-600 relative">
                 <FiShoppingCart size={20} />
-                <span className="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  2
-                </span>
+                {cart.itemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {cart.itemCount}
+                  </span>
+                )}
               </Link>
 
               {/* User Menu */}
@@ -218,10 +234,15 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
                       >
                         <item.icon className="mr-3" size={16} />
                         {item.label}
+                        {item.path === '/client/wishlist' && wishlistCount > 0 && (
+                          <span className="ml-auto bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
+                            {wishlistCount}
+                          </span>
+                        )}
                       </Link>
                     ))}
 
-                    {/* ✅ Nouvelle option : Changer le mot de passe */}
+                    {/* Changer mot de passe */}
                     <button
                       onClick={handleOpenPasswordModal}
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50"
@@ -232,6 +253,7 @@ const ClientNavbar = ({ onSearch, onCategorySelect }) => {
 
                     <hr className="my-2" />
                     
+                    {/* Déconnexion */}
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"

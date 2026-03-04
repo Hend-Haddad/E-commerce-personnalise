@@ -40,7 +40,7 @@ const FlashSales = ({ products }) => {
   to="/products"
   className="text-indigo-600 hover:text-indigo-800 font-medium"
 >
-  View All Products →
+  voir tous les produits →
 </Link>
         </div>
 

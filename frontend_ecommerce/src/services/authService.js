@@ -2,25 +2,45 @@ import api from './api';
 
 export const register = async (userData) => {
   try {
-   console.log('📤 Données envoyées:', userData) // Pour déboguer
-    const response = await api.post('/auth/register', userData)
-    console.log('📥 Réponse reçue:', response.data)
-    return response.data
+    console.log('📤 Données envoyées:', userData);
+    const response = await api.post('/auth/register', userData);
+    console.log('📥 Réponse reçue:', response.data);
+    return response.data;
   } catch (error) {
-    throw error
+    throw error;
   }
-}
+};
 
 export const login = async (credentials) => {
   try {
-    const response = await api.post('/auth/login', credentials)
-    return response.data
+    console.log('📤 Tentative de login avec:', credentials.email);
+    
+    const response = await api.post('/auth/login', credentials);
+    console.log('📥 Réponse login brute:', response);
+    console.log('📥 Réponse login data:', response.data);
+    
+    if (response.data.success) {
+      const { user, token } = response.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      console.log('✅ Token stocké:', token.substring(0, 20) + '...');
+      console.log('✅ User stocké:', user);
+      
+      return {
+        success: true,
+        user,
+        token
+      };
+    }
+    
+    return response.data;
   } catch (error) {
-    throw error
+    console.error('❌ Erreur login:', error.response?.data || error.message);
+    throw error;
   }
-}
-
-
+};
 
 export const getProfile = async (token) => {
   try {
@@ -38,7 +58,7 @@ export const getProfile = async (token) => {
   }
 };
 
-// ✅ NOUVEAU : Mettre à jour le profil
+// ✅ Fonction pour mettre à jour le profil
 export const updateProfile = async (profileData) => {
   try {
     console.log('📡 Mise à jour du profil avec:', profileData);

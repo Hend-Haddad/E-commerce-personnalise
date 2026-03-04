@@ -1,4 +1,3 @@
-// src/hooks/useAuth.js
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
@@ -9,24 +8,19 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
 
-  const { user, login, logout, updateUser, loading } = context;
+  const { user, login, logout, updateUser, loading } = context;  // ← Ajoutez updateUser ici
 
-  const isAdmin = () => {
-    return user?.role === 'admin';
-  };
-
-  const isClient = () => {
-    return user?.role === 'client';
-  };
+  console.log('👤 useAuth - user actuel:', user);
 
   return {
     user,
     login,
     logout,
-    updateUser, // ← Nouvelle fonction
+    updateUser,  // ← Maintenant disponible
     loading,
-    isAdmin,
-    isClient,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'admin',
+    isClient: user?.role === 'client',
     token: localStorage.getItem('token')
   };
 };
