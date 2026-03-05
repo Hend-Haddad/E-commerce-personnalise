@@ -1,8 +1,8 @@
-// src/components/admin/AdminRoute.jsx (version simplifiée)
+// src/components/admin/AdminRoute.jsx
 import { Navigate } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '../../context/AuthContext';
-
+import Loader from '../common/Loader'; // ← IMPORTANT: Importer Loader
 
 const AdminRoute = ({ children }) => {
   const context = useContext(AuthContext);

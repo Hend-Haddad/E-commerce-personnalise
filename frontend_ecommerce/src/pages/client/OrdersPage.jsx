@@ -167,7 +167,7 @@ const OrdersPage = () => {
         ) : (
           <div className="space-y-4">
             {filteredOrders.map((order) => {
-              const statusBadge = getStatusBadge(order.statut);
+              const statusBadge = getStatusBadge(order.status); 
               const StatusIcon = statusBadge.icon;
               
               return (

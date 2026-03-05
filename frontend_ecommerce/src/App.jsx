@@ -12,7 +12,7 @@ import DashboardHome from './pages/admin/DashboardHome';
 import CategoriesPage from './pages/admin/CategoriesPage';
 
 import ClientsPage from './pages/admin/ClientsPage';
-//import OrdersPage from './pages/admin/OrdersPage';
+
 import AdminRoute from './components/admin/AdminRoute';
 import ProductDetails from './pages/product/ProductDetails';
 import ProductsPage from './pages/product/ProductsPage';
@@ -28,6 +28,9 @@ import NotificationsPage from './pages/client/NotificationsPage';
 import OrdersPage from './pages/client/OrdersPage';
 import CartPage from './pages/CartPage';
 import OrderDetailsPage from './pages/client/OrderDetailsPage';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
+import AdminOrderDetailPage from './pages/admin/AdminOrderDetailPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -88,7 +91,8 @@ function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="products" element={<AdminProductsPage />} />
           <Route path="clients" element={<ClientsPage />} />
-          <Route path="orders" element={<OrdersPage />} />
+          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
         </Route>
       </Routes>
     </AuthProvider>
