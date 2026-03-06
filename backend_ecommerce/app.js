@@ -10,6 +10,7 @@ import cartRoutes from "./routes/cartRoutes.js";
 import orderRoutes from './routes/orderRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
 import adminOrderRoutes from './routes/adminOrderRoutes.js';
+import adminClientRoutes from './routes/adminClientRoutes.js';
 import { createDefaultAdmin } from "./scripts/createAdmin.js";
 // backend/src/app.js (ajoutez ces lignes)
 import path from 'path';
@@ -47,6 +48,7 @@ app.use("/api/cart", optionalAuth,cartRoutes);
 app.use("/api/orders", protect, orderRoutes); 
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
+app.use("/api/admin/clients", adminClientRoutes);
 // Route 404
 app.use((req, res) => {
   res.status(404).json({ 

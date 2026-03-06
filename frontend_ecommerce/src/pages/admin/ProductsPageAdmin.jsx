@@ -1,4 +1,4 @@
-// src/pages/admin/ProductsPage.jsx
+// src/pages/admin/ProductsPageAdmin.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FiEdit2, 
@@ -11,16 +11,23 @@ import {
   FiArchive,
   FiEye
 } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { productService } from '../../services/productService';
 import { categoryService } from '../../services/categoryService';
 import ProductModal from './ProductModal';
+import ProductViewModal from './ProductViewModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import PageHeader from '../../components/admin/PageHeader';
+import StatsCard from '../../components/admin/StatsCard';
+import SearchFilter from '../../components/admin/SearchFilter';
+import DataTable from '../../components/admin/DataTable';
+import Pagination from '../../components/common/Pagination';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const ProductsPage = () => {
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [paginatedProducts, setPaginatedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +39,15 @@ const ProductsPage = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalMode, setModalMode] = useState('add');
   const [refresh, setRefresh] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalItems: 0,
+    totalPages: 1
+  });
+  
   const [stats, setStats] = useState({
     total: 0,
     actifs: 0,
@@ -39,59 +55,36 @@ const ProductsPage = () => {
     valeurStock: 0
   });
 
-  // Charger les produits et catégories
   useEffect(() => {
-    loadData();
+    loadAllData();
   }, [refresh]);
 
-  // Filtrer les produits
   useEffect(() => {
-    let filtered = [...products];
+    applyFilters();
+  }, [searchTerm, selectedCategory, selectedStatus, allProducts]);
 
-    // Filtre par recherche
-    if (searchTerm) {
-      filtered = filtered.filter(p => 
-        p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+  useEffect(() => {
+    applyPagination();
+  }, [filteredProducts, pagination.currentPage, pagination.itemsPerPage]);
 
-    // Filtre par catégorie
-    if (selectedCategory) {
-      filtered = filtered.filter(p => p.categorie_id?._id === selectedCategory);
-    }
-
-    // Filtre par statut
-    if (selectedStatus === 'actif') {
-      filtered = filtered.filter(p => p.actif);
-    } else if (selectedStatus === 'inactif') {
-      filtered = filtered.filter(p => !p.actif);
-    }
-
-    setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, selectedStatus, products]);
-
-  const loadData = async () => {
+  const loadAllData = async () => {
     try {
       setLoading(true);
+      console.log('📦 Chargement de tous les produits...');
       
-      // Charger les produits
       const productsData = await productService.getAllProducts();
-      setProducts(productsData.products || []);
+      console.log('✅ Produits reçus:', productsData);
       
-      // Calculer les statistiques
-      const actifs = productsData.products?.filter(p => p.actif) || [];
-      const stockTotal = productsData.products?.reduce((acc, p) => acc + (p.quantite_stock || 0), 0) || 0;
-      const valeurStock = productsData.products?.reduce((acc, p) => acc + ((p.prix || 0) * (p.quantite_stock || 0)), 0) || 0;
+      const allProds = productsData.products || [];
+      setAllProducts(allProds);
       
       setStats({
-        total: productsData.products?.length || 0,
-        actifs: actifs.length,
-        stockTotal,
-        valeurStock
+        total: allProds.length,
+        actifs: allProds.filter(p => p.actif).length,
+        stockTotal: allProds.reduce((acc, p) => acc + (p.quantite_stock || 0), 0),
+        valeurStock: allProds.reduce((acc, p) => acc + ((p.prix || 0) * (p.quantite_stock || 0)), 0)
       });
 
-      // Charger les catégories pour le filtre
       const categoriesData = await categoryService.getAllCategories();
       setCategories(categoriesData.categories || []);
 
@@ -103,6 +96,42 @@ const ProductsPage = () => {
     }
   };
 
+  const applyFilters = () => {
+    let filtered = [...allProducts];
+
+    if (searchTerm) {
+      filtered = filtered.filter(p => 
+        p.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter(p => p.categorie_id?._id === selectedCategory);
+    }
+
+    if (selectedStatus === 'actif') {
+      filtered = filtered.filter(p => p.actif);
+    } else if (selectedStatus === 'inactif') {
+      filtered = filtered.filter(p => !p.actif);
+    }
+
+    setFilteredProducts(filtered);
+    setPagination(prev => ({
+      ...prev,
+      currentPage: 1,
+      totalItems: filtered.length,
+      totalPages: Math.ceil(filtered.length / prev.itemsPerPage)
+    }));
+  };
+
+  const applyPagination = () => {
+    const start = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const end = start + pagination.itemsPerPage;
+    setPaginatedProducts(filteredProducts.slice(start, end));
+  };
+
+  // ✅ TOUTES LES FONCTIONS HANDLE SONT DÉFINIES ICI
   const handleAddProduct = () => {
     setSelectedProduct(null);
     setModalMode('add');
@@ -155,12 +184,22 @@ const ProductsPage = () => {
     }
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'DTN',
-      minimumFractionDigits: 2
-    }).format(price);
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, currentPage: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getDisplayImage = (product) => {
+    if (product.image_principale && product.image_principale !== 'default-product.jpg') {
+      return product.image_principale.startsWith('http') 
+        ? product.image_principale 
+        : `http://localhost:5000${product.image_principale}`;
+    }
+    if (product.images && product.images.length > 0) {
+      const firstImage = product.images[0];
+      return firstImage.startsWith('http') ? firstImage : `http://localhost:5000${firstImage}`;
+    }
+    return '/default-product.jpg';
   };
 
   const getStockStatus = (stock) => {
@@ -169,292 +208,174 @@ const ProductsPage = () => {
     return { label: 'En stock', color: 'bg-green-100 text-green-800' };
   };
 
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'TND'
+    }).format(price);
+  };
+
+  // Options de filtres
+  const filterOptions = [
+    {
+      value: selectedCategory,
+      onChange: setSelectedCategory,
+      options: [
+        { value: '', label: 'Toutes les catégories' },
+        ...categories.map(cat => ({ value: cat._id, label: cat.nom }))
+      ]
+    },
+    {
+      value: selectedStatus,
+      onChange: setSelectedStatus,
+      options: [
+        { value: 'tous', label: 'Tous' },
+        { value: 'actif', label: 'Actifs' },
+        { value: 'inactif', label: 'Inactifs' }
+      ]
+    }
+  ];
+
+  // Définition des colonnes pour DataTable
+  const columns = [
+    {
+      header: 'Image',
+      accessor: 'image',
+      render: (product) => (
+        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+          <img
+            src={getDisplayImage(product)}
+            alt={product.nom}
+            className="w-full h-full object-cover"
+            onError={(e) => { e.target.src = '/default-product.jpg'; }}
+          />
+        </div>
+      )
+    },
+    {
+      header: 'Produit',
+      accessor: 'nom',
+      render: (product) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{product.nom}</div>
+          <div className="text-sm text-gray-500 truncate max-w-xs">
+            {product.description?.substring(0, 50)}...
+          </div>
+        </div>
+      )
+    },
+    {
+      header: 'Catégorie',
+      accessor: 'categorie',
+      render: (product) => (
+        <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800">
+          {product.categorie_id?.nom || 'Non catégorisé'}
+        </span>
+      )
+    },
+    {
+      header: 'Prix',
+      accessor: 'prix',
+      render: (product) => (
+        <div className="text-sm font-bold text-gray-900">{formatPrice(product.prix)}</div>
+      )
+    },
+    {
+      header: 'Stock',
+      accessor: 'stock',
+      render: (product) => {
+        const status = getStockStatus(product.quantite_stock);
+        return (
+          <span className={`px-2 py-1 text-xs rounded-full ${status.color}`}>
+            {product.quantite_stock} {status.label}
+          </span>
+        );
+      }
+    },
+    {
+      header: 'Statut',
+      accessor: 'statut',
+      render: (product) => (
+        <span className={`px-2 py-1 text-xs rounded-full ${
+          product.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {product.actif ? 'Actif' : 'Inactif'}
+        </span>
+      )
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      render: (product) => (
+        <span className="text-sm text-gray-500">
+          {new Date(product.created_at || product.date_ajout).toLocaleDateString('fr-FR')}
+        </span>
+      )
+    }
+  ];
+
+  if (loading && allProducts.length === 0) {
+    return <LoadingSpinner fullScreen text="Chargement des produits..." />;
+  }
+
   return (
     <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Gestion des Produits</h1>
-          <p className="text-gray-600 mt-1">Gérez tous vos produits et leur stock</p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setRefresh(prev => prev + 1)}
-            className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-            title="Rafraîchir"
-          >
-            <FiRefreshCw className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Actualiser
-          </button>
-          <button
-            onClick={handleAddProduct}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-          >
-            <FiPlus className="mr-2" />
-            Nouveau produit
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Gestion des Produits"
+        subtitle="Gérez tous vos produits et leur stock"
+        resultCount={filteredProducts.length}
+        onRefresh={() => setRefresh(prev => prev + 1)}
+        onAdd={handleAddProduct}  // ← ICI handleAddProduct est bien défini
+        addLabel="Nouveau produit"
+        loading={loading}
+      />
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total produits</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-            </div>
-            <FiPackage className="text-indigo-500 text-2xl" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Produits actifs</p>
-              <p className="text-2xl font-bold text-green-600">{stats.actifs}</p>
-            </div>
-            <FiEye className="text-green-500 text-2xl" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Stock total</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.stockTotal}</p>
-            </div>
-            <FiArchive className="text-blue-500 text-2xl" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Valeur du stock</p>
-              <p className="text-2xl font-bold text-purple-600">{formatPrice(stats.valeurStock)}</p>
-            </div>
-            <FiDollarSign className="text-purple-500 text-2xl" />
-          </div>
-        </div>
+        <StatsCard title="Total produits" value={stats.total} icon={FiPackage} color="indigo" />
+        <StatsCard title="Produits actifs" value={stats.actifs} icon={FiEye} color="green" />
+        <StatsCard title="Stock total" value={stats.stockTotal} icon={FiArchive} color="blue" />
+        <StatsCard title="Valeur du stock" value={formatPrice(stats.valeurStock)} icon={FiDollarSign} color="purple" />
       </div>
 
       {/* Filtres */}
-      <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Recherche */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Nom ou description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
+      <SearchFilter
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        onSearchSubmit={(e) => e.preventDefault()}
+        filters={filterOptions}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        placeholder="Rechercher par nom ou description..."
+        resultCount={filteredProducts.length}
+        resultLabel="produit(s)"
+      />
 
-          {/* Filtre par catégorie */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Toutes les catégories</option>
-              {categories.map(cat => (
-                <option key={cat._id} value={cat._id}>{cat.nom}</option>
-              ))}
-            </select>
-          </div>
+      {/* Tableau */}
+      <DataTable
+        columns={columns}
+        data={paginatedProducts}
+        loading={loading}
+        emptyMessage="Aucun produit trouvé"
+        onView={handleViewProduct}
+        onEdit={handleEditProduct}
+        onDelete={handleDeleteProduct}
+      />
 
-          {/* Filtre par statut */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="tous">Tous</option>
-              <option value="actif">Actifs</option>
-              <option value="inactif">Inactifs</option>
-            </select>
-          </div>
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={filteredProducts.length}
+            itemsPerPage={pagination.itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
-      </div>
+      )}
 
-
-
-{/* Tableau des produits */}
-<div className="bg-white rounded-lg shadow overflow-hidden">
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Catégorie</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-        {loading ? (
-          <tr>
-            <td colSpan="8" className="px-6 py-8 text-center">
-              <div className="flex justify-center items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                <span className="ml-3 text-gray-500">Chargement...</span>
-              </div>
-            </td>
-          </tr>
-        ) : filteredProducts.length === 0 ? (
-          <tr>
-            <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
-              Aucun produit trouvé
-            </td>
-          </tr>
-        ) : (
-          filteredProducts.map((product) => {
-            const stockStatus = getStockStatus(product.quantite_stock);
-            
-            // ✅ Fonction pour obtenir l'image à afficher dans la liste
-            const getDisplayImage = () => {
-              // Priorité à l'image principale
-              if (product.image_principale && product.image_principale !== 'default-product.jpg') {
-                return product.image_principale.startsWith('http') 
-                  ? product.image_principale 
-                  : `http://localhost:5000${product.image_principale}`;
-              }
-              
-              // Sinon, prendre la première image du tableau images
-              if (product.images && product.images.length > 0) {
-                const firstImage = product.images[0];
-                return firstImage.startsWith('http') 
-                  ? firstImage 
-                  : `http://localhost:5000${firstImage}`;
-              }
-              
-              // Sinon, image par défaut
-              return '/default-product.jpg';
-            };
-
-            return (
-              <tr key={product._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                    <img
-                      src={getDisplayImage()}
-                      alt={product.nom}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.log('❌ Erreur chargement image:', product.image_principale);
-                        e.target.onerror = null; // Évite la boucle infinie
-                        e.target.src = '/default-product.jpg';
-                      }}
-                    />
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900">{product.nom}</div>
-                  <div className="text-sm text-gray-500 truncate max-w-xs">
-                    {product.description?.substring(0, 50)}...
-                  </div>
-                  {/* Indicateur du nombre d'images */}
-                  {product.images && product.images.length > 1 && (
-                    <div className="text-xs text-indigo-600 mt-1">
-                      +{product.images.length - 1} autres images
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800">
-                    {product.categorie_id?.nom || 'Non catégorisé'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-bold text-gray-900">{formatPrice(product.prix)}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs rounded-full ${stockStatus.color}`}>
-                    {product.quantite_stock} {stockStatus.label}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    product.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {product.actif ? 'Actif' : 'Inactif'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(product.date_ajout).toLocaleDateString('fr-FR')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => handleViewProduct(product)}
-                    className="text-gray-600 hover:text-gray-900 mr-2 p-2 hover:bg-gray-100 rounded-lg transition"
-                    title="Voir détails"
-                  >
-                    <FiEye size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleEditProduct(product)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-2 p-2 hover:bg-indigo-50 rounded-lg transition"
-                    title="Modifier"
-                  >
-                    <FiEdit2 size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProduct(product)}
-                    className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition"
-                    title={product.actif ? 'Désactiver' : 'Supprimer'}
-                  >
-                    <FiTrash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            );
-          })
-        )}
-      </tbody>
-    </table>
-  </div>
-
-  {/* Pagination */}
-  <div className="bg-white px-6 py-4 flex items-center justify-between border-t border-gray-200">
-    <div className="text-sm text-gray-500">
-      Affichage de <span className="font-medium">1</span> à <span className="font-medium">{filteredProducts.length}</span> sur <span className="font-medium">{products.length}</span> produits
-    </div>
-    <div className="flex space-x-2">
-      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-        Précédent
-      </button>
-      <button className="px-3 py-1 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700">
-        1
-      </button>
-      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-        2
-      </button>
-      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-        3
-      </button>
-      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-        Suivant
-      </button>
-    </div>
-  </div>
-</div>
-
-      {/* Modal d'ajout/édition */}
+      {/* Modals */}
       <ProductModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -464,7 +385,6 @@ const ProductsPage = () => {
         categories={categories}
       />
 
-      {/* Modal de consultation */}
       {viewModalOpen && selectedProduct && (
         <ProductViewModal
           isOpen={viewModalOpen}
@@ -473,7 +393,6 @@ const ProductsPage = () => {
         />
       )}
 
-      {/* Modal de confirmation de suppression */}
       <DeleteConfirmModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}

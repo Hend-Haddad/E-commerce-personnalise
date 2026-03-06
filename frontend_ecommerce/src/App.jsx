@@ -30,6 +30,7 @@ import CartPage from './pages/CartPage';
 import OrderDetailsPage from './pages/client/OrderDetailsPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminOrderDetailPage from './pages/admin/AdminOrderDetailPage';
+import ClientDetailPage from './pages/admin/ClientDetailPage';
 
 function App() {
   return (
@@ -91,6 +92,7 @@ function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="products" element={<AdminProductsPage />} />
           <Route path="clients" element={<ClientsPage />} />
+          <Route path="/admin/clients/:id" element={<ClientDetailPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
         </Route>

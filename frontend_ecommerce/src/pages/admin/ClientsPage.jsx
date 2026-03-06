@@ -1,302 +1,266 @@
 // src/pages/admin/ClientsPage.jsx
-import React, { useState } from 'react';
-import { FiSearch, FiEdit2, FiTrash2, FiUserCheck, FiUserX, FiMail, FiPhone, FiMapPin } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { 
+  FiUsers, 
+  FiUserCheck, 
+  FiUserX, 
+  FiMail, 
+  FiPhone, 
+  FiMapPin, 
+  FiCalendar,
+  FiEye
+} from 'react-icons/fi';
+import { adminClientService } from '../../services/adminClientService';
+import PageHeader from '../../components/admin/PageHeader';
+import StatsCard from '../../components/admin/StatsCard';
+import SearchFilter from '../../components/admin/SearchFilter';
+import DataTable from '../../components/admin/DataTable';
+import Pagination from '../../components/common/Pagination';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import StatusBadge from '../../components/common/StatusBadge';
 import toast from 'react-hot-toast';
 
 const ClientsPage = () => {
-  const [clients, setClients] = useState([
-    { 
-      id: 1, 
-      nom: 'Dupont', 
-      prenom: 'Jean', 
-      email: 'jean.dupont@email.com', 
-      telephone: '+33 6 12 34 56 78',
-      adresse: '15 Rue de Paris, 75001 Paris',
-      date_inscription: '2026-01-15',
-      commandes: 12,
-      total_achete: 1250.50,
-      statut: 'actif',
-      kyc: 'vérifié'
-    },
-    { 
-      id: 2, 
-      nom: 'Martin', 
-      prenom: 'Sophie', 
-      email: 'sophie.martin@email.com', 
-      telephone: '+33 6 23 45 67 89',
-      adresse: '8 Avenue des Champs, 69002 Lyon',
-      date_inscription: '2026-02-01',
-      commandes: 5,
-      total_achete: 450.75,
-      statut: 'actif',
-      kyc: 'en_cours'
-    },
-    { 
-      id: 3, 
-      nom: 'Bernard', 
-      prenom: 'Pierre', 
-      email: 'pierre.bernard@email.com', 
-      telephone: '+33 7 34 56 78 90',
-      adresse: '23 Rue de la République, 13001 Marseille',
-      date_inscription: '2026-01-20',
-      commandes: 8,
-      total_achete: 890.30,
-      statut: 'inactif',
-      kyc: 'non_vérifié'
-    },
-    { 
-      id: 4, 
-      nom: 'Petit', 
-      prenom: 'Marie', 
-      email: 'marie.petit@email.com', 
-      telephone: '+33 6 45 67 89 01',
-      adresse: '5 Place du Capitole, 31000 Toulouse',
-      date_inscription: '2026-02-10',
-      commandes: 3,
-      total_achete: 210.90,
-      statut: 'actif',
-      kyc: 'vérifié'
-    },
-  ]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('tous');
-  const [filterKyc, setFilterKyc] = useState('tous');
-
-  const filteredClients = clients.filter(client => {
-    const matchesSearch = 
-      client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'tous' || client.statut === filterStatus;
-    const matchesKyc = filterKyc === 'tous' || client.kyc === filterKyc;
-
-    return matchesSearch && matchesStatus && matchesKyc;
+  const [allClients, setAllClients] = useState([]);
+  const [filteredClients, setFilteredClients] = useState([]);
+  const [paginatedClients, setPaginatedClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({});
+  const [filters, setFilters] = useState({ search: '', actif: '' });
+  const [showFilters, setShowFilters] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  
+  // Pagination
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalItems: 0,
+    totalPages: 1
   });
 
-  const getStatusBadge = (statut) => {
-    switch(statut) {
-      case 'actif':
-        return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 flex items-center">
-          <FiUserCheck className="mr-1" size={12} /> Actif
-        </span>;
-      case 'inactif':
-        return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 flex items-center">
-          <FiUserX className="mr-1" size={12} /> Inactif
-        </span>;
-      default:
-        return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{statut}</span>;
+  useEffect(() => {
+    loadAllClients();
+  }, [refresh]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [filters.search, filters.actif, allClients]);
+
+  useEffect(() => {
+    applyPagination();
+  }, [filteredClients, pagination.currentPage, pagination.itemsPerPage]);
+
+  const loadAllClients = async () => {
+    try {
+      setLoading(true);
+      console.log('👥 Chargement de tous les clients...');
+      
+      const data = await adminClientService.getAllClients();
+      console.log('✅ Clients reçus:', data);
+      
+      setAllClients(data.clients || []);
+      setStats(data.stats || {});
+      
+    } catch (error) {
+      console.error('❌ Erreur chargement clients:', error);
+      toast.error('Erreur lors du chargement des clients');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getKycBadge = (kyc) => {
-    switch(kyc) {
-      case 'vérifié':
-        return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Vérifié</span>;
-      case 'en_cours':
-        return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">En cours</span>;
-      case 'non_vérifié':
-        return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Non vérifié</span>;
-      default:
-        return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{kyc}</span>;
+  const applyFilters = () => {
+    let filtered = [...allClients];
+
+    if (filters.search) {
+      filtered = filtered.filter(client => 
+        client.nom?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        client.prenom?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        client.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        client.telephone?.includes(filters.search)
+      );
+    }
+
+    if (filters.actif === 'true') {
+      filtered = filtered.filter(client => client.actif === true);
+    } else if (filters.actif === 'false') {
+      filtered = filtered.filter(client => client.actif === false);
+    }
+
+    setFilteredClients(filtered);
+    setPagination(prev => ({
+      ...prev,
+      currentPage: 1,
+      totalItems: filtered.length,
+      totalPages: Math.ceil(filtered.length / prev.itemsPerPage)
+    }));
+  };
+
+  const applyPagination = () => {
+    const start = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const end = start + pagination.itemsPerPage;
+    setPaginatedClients(filteredClients.slice(start, end));
+  };
+
+  const handleToggleStatus = async (clientId, currentStatus) => {
+    try {
+      const result = await adminClientService.toggleClientStatus(clientId, !currentStatus);
+      if (result?.success) {
+        toast.success(`Client ${!currentStatus ? 'activé' : 'désactivé'}`);
+        loadAllClients();
+      }
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      toast.error('Erreur lors du changement de statut');
     }
   };
+
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, currentPage: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Options de filtres
+  const filterOptions = [
+    {
+      value: filters.actif,
+      onChange: (value) => setFilters(prev => ({ ...prev, actif: value })),
+      options: [
+        { value: '', label: 'Tous les clients' },
+        { value: 'true', label: 'Clients actifs' },
+        { value: 'false', label: 'Clients inactifs' }
+      ]
+    }
+  ];
+
+  // Définition des colonnes pour DataTable
+  const columns = [
+    {
+      header: 'Client',
+      accessor: 'client',
+      render: (client) => (
+        <div className="flex items-center">
+          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+            {client.prenom?.charAt(0)}{client.nom?.charAt(0)}
+          </div>
+          <div className="ml-4">
+            <p className="font-medium text-gray-900">
+              {client.prenom} {client.nom}
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: 'Contact',
+      accessor: 'contact',
+      render: (client) => (
+        <div className="space-y-1">
+          <p className="text-sm text-gray-900 flex items-center">
+            <FiMail className="mr-2 text-gray-400" size={14} />
+            {client.email}
+          </p>
+          {client.telephone && (
+            <p className="text-sm text-gray-900 flex items-center">
+              <FiPhone className="mr-2 text-gray-400" size={14} />
+              {client.telephone}
+            </p>
+          )}
+        </div>
+      )
+    },
+    {
+      header: 'Adresse',
+      accessor: 'adresse',
+      render: (client) => (
+        <p className="text-sm text-gray-900 flex items-center">
+          <FiMapPin className="mr-2 text-gray-400 flex-shrink-0" size={14} />
+          <span className="line-clamp-2">{client.adresse || 'Non renseignée'}</span>
+        </p>
+      )
+    },
+    {
+      header: 'Inscription',
+      accessor: 'date',
+      render: (client) => (
+        <span className="text-sm text-gray-500">{formatDate(client.created_at)}</span>
+      )
+    },
+    {
+      header: 'Statut',
+      accessor: 'statut',
+      render: (client) => (
+        <StatusBadge status={client.actif} type="user" />
+      )
+    }
+  ];
+
+  if (loading && allClients.length === 0) {
+    return <LoadingSpinner fullScreen text="Chargement des clients..." />;
+  }
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Gestion des clients</h1>
-          <p className="text-gray-600 mt-1">Gérez tous vos clients et leurs informations</p>
-        </div>
-        <div className="flex space-x-3">
-          <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center">
-            <FiMail className="mr-2" />
-            Envoyer une notification
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Gestion des clients"
+        resultCount={filteredClients.length}
+        onRefresh={() => setRefresh(prev => prev + 1)}
+        loading={loading}
+      />
 
-      {/* Filtres et recherche */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Recherche */}
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Nom, prénom ou email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Filtre par statut */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="tous">Tous les statuts</option>
-              <option value="actif">Actifs</option>
-              <option value="inactif">Inactifs</option>
-            </select>
-          </div>
-
-          {/* Filtre par KYC */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Vérification KYC</label>
-            <select
-              value={filterKyc}
-              onChange={(e) => setFilterKyc(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="tous">Tous</option>
-              <option value="vérifié">Vérifiés</option>
-              <option value="en_cours">En cours</option>
-              <option value="non_vérifié">Non vérifiés</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Statistiques rapides */}
+      {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Total clients</p>
-          <p className="text-2xl font-bold text-gray-800">{clients.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Clients actifs</p>
-          <p className="text-2xl font-bold text-green-600">{clients.filter(c => c.statut === 'actif').length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Clients inactifs</p>
-          <p className="text-2xl font-bold text-red-600">{clients.filter(c => c.statut === 'inactif').length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">KYC vérifiés</p>
-          <p className="text-2xl font-bold text-indigo-600">{clients.filter(c => c.kyc === 'vérifié').length}</p>
-        </div>
+        <StatsCard title="Total clients" value={stats.total || 0} icon={FiUsers} color="indigo" />
+        <StatsCard title="Clients actifs" value={stats.actifs || 0} icon={FiUserCheck} color="green" />
+        <StatsCard title="Clients inactifs" value={stats.inactifs || 0} icon={FiUserX} color="red" />
+        <StatsCard title="Nouveaux (30 jours)" value={stats.nouveaux || 0} icon={FiCalendar} color="purple" />
       </div>
 
-      {/* Tableau des clients */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statistiques
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  KYC
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Inscription
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
-                        {client.prenom.charAt(0)}{client.nom.charAt(0)}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {client.prenom} {client.nom}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          ID: {client.id}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{client.email}</div>
-                    <div className="text-sm text-gray-500 flex items-center mt-1">
-                      <FiPhone size={12} className="mr-1" />
-                      {client.telephone}
-                    </div>
-                    <div className="text-sm text-gray-500 flex items-center mt-1">
-                      <FiMapPin size={12} className="mr-1" />
-                      {client.adresse.substring(0, 20)}...
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{client.commandes} commandes</div>
-                    <div className="text-sm font-semibold text-indigo-600">{client.total_achete} DT</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(client.statut)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getKycBadge(client.kyc)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(client.date_inscription).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button className="text-indigo-600 hover:text-indigo-900 mr-3">
-                      <FiEdit2 size={18} />
-                    </button>
-                    <button className="text-red-600 hover:text-red-900">
-                      <FiTrash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Filtres */}
+      <SearchFilter
+        searchValue={filters.search}
+        onSearchChange={(value) => setFilters(prev => ({ ...prev, search: value }))}
+        onSearchSubmit={(e) => e.preventDefault()}
+        filters={filterOptions}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        placeholder="Rechercher par nom, email ou téléphone..."
+        resultCount={filteredClients.length}
+        resultLabel="client(s)"
+      />
 
-        {/* Pagination */}
-        <div className="bg-white px-6 py-4 flex items-center justify-between border-t border-gray-200">
-          <div className="text-sm text-gray-500">
-            Affichage de <span className="font-medium">1</span> à <span className="font-medium">{filteredClients.length}</span> sur <span className="font-medium">{clients.length}</span> clients
-          </div>
-          <div className="flex space-x-2">
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-              Précédent
-            </button>
-            <button className="px-3 py-1 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700">
-              1
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-              2
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-              3
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-              Suivant
-            </button>
-          </div>
+      {/* Tableau */}
+      <DataTable
+        columns={columns}
+        data={paginatedClients}
+        loading={loading}
+        emptyMessage="Aucun client trouvé"
+        onView={(client) => window.location.href = `/admin/clients/${client._id}`}
+        actions={true}
+      />
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={filteredClients.length}
+            itemsPerPage={pagination.itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
-      </div>
+      )}
     </div>
   );
 };
